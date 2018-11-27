@@ -1,13 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	_ "net/http/pprof"
+	"os"
 	"time"
 
 	"apiserver/config"
 	"apiserver/model"
+	v "apiserver/pkg/version"
 	"apiserver/router"
+	"apiserver/router/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lexkong/log"
@@ -16,11 +22,33 @@ import (
 )
 
 var (
-	cfg = pflag.StringP("config", "c", "", "apiserver config file path.")
+	cfg     = pflag.StringP("config", "c", "", "apiserver config file path.")
+	version = pflag.BoolP("version", "v", false, "show version info.")
 )
 
+// @title Apiserver Example API
+// @version 1.0
+// @description apiserver demo
+
+// @contact.name lkong
+// @contact.url http://www.swagger.io/support
+// @contact.email 466701708@qq.com
+
+// @host localhost:8080
+// @BasePath /v1
 func main() {
 	pflag.Parse()
+	if *version {
+		v := v.Get()
+		marshalled, err := json.MarshalIndent(&v, "", "  ")
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(string(marshalled))
+		return
+	}
 
 	// init config
 	if err := config.Init(*cfg); err != nil {
@@ -37,15 +65,14 @@ func main() {
 	// Create the Gin engine.
 	g := gin.New()
 
-	middlewares := []gin.HandlerFunc{}
-
 	// Routes.
 	router.Load(
 		// Cores.
 		g,
 
 		// Middlwares.
-		middlewares...,
+		middleware.Logging(),
+		middleware.RequestId(),
 	)
 
 	// Ping the server to make sure the router is working.
@@ -55,6 +82,16 @@ func main() {
 		}
 		log.Info("The router has been deployed successfully.")
 	}()
+
+	// Start to listening the incoming requests.
+	cert := viper.GetString("tls.cert")
+	key := viper.GetString("tls.key")
+	if cert != "" && key != "" {
+		go func() {
+			log.Infof("Start to listening the incoming requests on https address: %s", viper.GetString("tls.addr"))
+			log.Info(http.ListenAndServeTLS(viper.GetString("tls.addr"), cert, key, g).Error())
+		}()
+	}
 
 	log.Infof("Start to listening the incoming requests on http address: %s", viper.GetString("addr"))
 	log.Info(http.ListenAndServe(viper.GetString("addr"), g).Error())

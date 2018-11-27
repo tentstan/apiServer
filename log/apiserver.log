@@ -1,0 +1,2 @@
+{"level":"INFO","timestamp":"2018-11-14 22:28:54.959","file":"apiServer/main.go:54","msg":"Start to listening the incoming requests on http address: :7777"}
+{"level":"INFO","timestamp":"2018-11-14 22:28:55.461","file":"apiServer/main.go:51","msg":"The router has been deployed successfully."}
